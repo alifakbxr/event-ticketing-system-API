@@ -1,0 +1,559 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "Event Ticketing System API",
+        "description": "A REST API for an Event Ticketing System built with Go and PostgreSQL",
+        "version": "1.0.0",
+        "contact": {
+            "name": "API Support",
+            "email": "support@example.com"
+        }
+    },
+    "host": "localhost:8005",
+    "basePath": "/",
+    "schemes": ["http", "https"],
+    "consumes": ["application/json"],
+    "produces": ["application/json"],
+    "securityDefinitions": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "Enter the token in the format: Bearer {token}"
+        }
+    },
+    "paths": {
+        "/api/register": {
+            "post": {
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "user",
+                        "description": "User registration data",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/UserRegistration"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "User registered successfully"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    }
+                }
+            }
+        },
+        "/api/login": {
+            "post": {
+                "summary": "User login",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "credentials",
+                        "description": "User login credentials",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/UserLogin"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login successful"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                }
+            }
+        },
+        "/api/events": {
+            "get": {
+                "summary": "Get all events",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of events",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/Event"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "summary": "Create a new event",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "event",
+                        "description": "Event data",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Event"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Event created successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - Admin access required"
+                    }
+                }
+            }
+        },
+        "/api/events/{id}": {
+            "get": {
+                "summary": "Get event by ID",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "type": "integer",
+                        "required": true,
+                        "description": "Event ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Event details",
+                        "schema": {
+                            "$ref": "#/definitions/Event"
+                        }
+                    },
+                    "404": {
+                        "description": "Event not found"
+                    }
+                }
+            },
+            "put": {
+                "summary": "Update event",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "type": "integer",
+                        "required": true,
+                        "description": "Event ID"
+                    },
+                    {
+                        "in": "body",
+                        "name": "event",
+                        "description": "Updated event data",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Event"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Event updated successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - Admin access required"
+                    },
+                    "404": {
+                        "description": "Event not found"
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Delete event",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "type": "integer",
+                        "required": true,
+                        "description": "Event ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Event deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - Admin access required"
+                    },
+                    "404": {
+                        "description": "Event not found"
+                    }
+                }
+            }
+        },
+        "/api/events/{id}/purchase": {
+            "post": {
+                "summary": "Purchase ticket for an event",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "type": "integer",
+                        "required": true,
+                        "description": "Event ID"
+                    },
+                    {
+                        "in": "body",
+                        "name": "purchase",
+                        "description": "Ticket purchase data",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/TicketPurchase"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Ticket purchased successfully"
+                    },
+                    "400": {
+                        "description": "Bad request"
+                    },
+                    "404": {
+                        "description": "Event not found"
+                    }
+                }
+            }
+        },
+        "/api/tickets": {
+            "get": {
+                "summary": "Get user's tickets",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of user's tickets",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/Ticket"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/tickets/{id}": {
+            "get": {
+                "summary": "Get ticket by ID",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "type": "integer",
+                        "required": true,
+                        "description": "Ticket ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ticket details",
+                        "schema": {
+                            "$ref": "#/definitions/Ticket"
+                        }
+                    },
+                    "404": {
+                        "description": "Ticket not found"
+                    }
+                }
+            }
+        },
+        "/api/tickets/{id}/validate": {
+            "post": {
+                "summary": "Validate ticket",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "type": "integer",
+                        "required": true,
+                        "description": "Ticket ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ticket validated successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - Admin access required"
+                    },
+                    "404": {
+                        "description": "Ticket not found"
+                    }
+                }
+            }
+        },
+        "/api/events/{id}/attendees": {
+            "get": {
+                "summary": "Get event attendees",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "type": "integer",
+                        "required": true,
+                        "description": "Event ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of event attendees",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/AttendanceLog"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - Admin access required"
+                    },
+                    "404": {
+                        "description": "Event not found"
+                    }
+                }
+            }
+        },
+        "/api/events/{id}/attendees/export": {
+            "get": {
+                "summary": "Export event attendees",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "type": "integer",
+                        "required": true,
+                        "description": "Event ID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CSV file with attendees data"
+                    },
+                    "403": {
+                        "description": "Forbidden - Admin access required"
+                    },
+                    "404": {
+                        "description": "Event not found"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "UserRegistration": {
+            "type": "object",
+            "required": ["username", "email", "password"],
+            "properties": {
+                "username": {
+                    "type": "string",
+                    "description": "Username for the new user"
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address"
+                },
+                "password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "Password"
+                }
+            }
+        },
+        "UserLogin": {
+            "type": "object",
+            "required": ["email", "password"],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address"
+                },
+                "password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "Password"
+                }
+            }
+        },
+        "Event": {
+            "type": "object",
+            "required": ["title", "description", "date", "location", "ticket_price", "total_tickets"],
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "Event ID"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Event title"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Event description"
+                },
+                "date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Event date and time"
+                },
+                "location": {
+                    "type": "string",
+                    "description": "Event location"
+                },
+                "ticket_price": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Price per ticket"
+                },
+                "total_tickets": {
+                    "type": "integer",
+                    "description": "Total number of tickets available"
+                },
+                "available_tickets": {
+                    "type": "integer",
+                    "description": "Number of tickets still available"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Creation timestamp"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Last update timestamp"
+                }
+            }
+        },
+        "Ticket": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "Ticket ID"
+                },
+                "event_id": {
+                    "type": "integer",
+                    "description": "Associated event ID"
+                },
+                "user_id": {
+                    "type": "integer",
+                    "description": "User who purchased the ticket"
+                },
+                "qr_code": {
+                    "type": "string",
+                    "description": "QR code for ticket validation"
+                },
+                "is_validated": {
+                    "type": "boolean",
+                    "description": "Whether the ticket has been validated"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Purchase timestamp"
+                }
+            }
+        },
+        "TicketPurchase": {
+            "type": "object",
+            "required": ["quantity"],
+            "properties": {
+                "quantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of tickets to purchase"
+                }
+            }
+        },
+        "AttendanceLog": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "Attendance log ID"
+                },
+                "ticket_id": {
+                    "type": "integer",
+                    "description": "Associated ticket ID"
+                },
+                "user_id": {
+                    "type": "integer",
+                    "description": "User ID"
+                },
+                "event_id": {
+                    "type": "integer",
+                    "description": "Event ID"
+                },
+                "validated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Validation timestamp"
+                }
+            }
+        }
+    }
+}
