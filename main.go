@@ -41,8 +41,13 @@ import (
 )
 
 func main() {
-	// Initialize Gin router
-	r := gin.New()
+ 	// Debug logging to validate build assumptions
+ 	log.Printf("DEBUG: Starting main.go from root directory")
+ 	log.Printf("DEBUG: Current working directory: %s", os.Getenv("PWD"))
+ 	log.Printf("DEBUG: Go version: %s", os.Getenv("GO_VERSION"))
+
+ 	// Initialize Gin router
+ 	r := gin.New()
 
 	// Add middleware
 	r.Use(gin.Logger())
