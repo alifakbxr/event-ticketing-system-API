@@ -21,34 +21,43 @@ A REST API for an Event Ticketing System built with Go and PostgreSQL, featuring
 ## ⚡ Quick Start
 
 ### Prerequisites
+
 - Go 1.21+
 - PostgreSQL database (local or Neon cloud database)
 
 ### Database Setup Options
 
 #### Option 1: Neon Cloud Database (Recommended)
+
 1. **Create a Neon account** at [neon.tech](https://neon.tech)
 2. **Create a new project** and copy the connection string
 3. **Configure environment**:
+
 ```bash
 cp .env.example .env
 # Edit .env and set DATABASE_URL with your Neon connection string
 ```
 
 #### Option 2: Local PostgreSQL
+
 1. **Install PostgreSQL** locally
 2. **Create database**:
+
 ```sql
 CREATE DATABASE event_ticketing;
 ```
+
 3. **Configure environment**:
+
 ```bash
 cp .env.example .env
 # Edit .env with your local database credentials
 ```
 
 ### Application Setup
+
 1. **Clone & install**:
+
 ```bash
 git clone <repository-url>
 cd event-ticketing-system
@@ -56,20 +65,23 @@ go mod tidy
 ```
 
 2. **Configure environment**:
+
 ```bash
 cp .env.example .env
 # Edit .env with your database credentials
 ```
 
 3. **Run the server**:
+
 ```bash
 go run cmd/server/main.go
 ```
 
-Server starts at `http://localhost:8080`
+Server starts at `http://localhost:8000`
 
 ### 📚 API Documentation
-Access interactive Swagger UI at: `http://localhost:8080/swagger/index.html`
+
+Access interactive Swagger UI at: `http://localhost:8000/swagger/index.html`
 
 ## ⚙️ Environment Configuration
 
@@ -78,11 +90,13 @@ Access interactive Swagger UI at: `http://localhost:8080/swagger/index.html`
 The application supports two methods for database configuration:
 
 #### Method 1: DATABASE_URL (Recommended for Neon)
+
 ```env
 DATABASE_URL=postgres://username:password@host/database?sslmode=require
 ```
 
 #### Method 2: Individual Variables (Fallback)
+
 ```env
 DB_HOST=localhost
 DB_PORT=5432
@@ -92,14 +106,16 @@ DB_NAME=event_ticketing
 ```
 
 ### Server Configuration
+
 ```env
-PORT=8080
+PORT=8000
 JWT_SECRET=your-secret-key-change-this-in-production
 ```
 
 ## 🔑 Authentication
 
 Use JWT tokens in Authorization header:
+
 ```
 Authorization: Bearer <your-jwt-token>
 ```
@@ -114,27 +130,31 @@ Authorization: Bearer <your-jwt-token>
 ### Quick Examples
 
 **Register a user**:
+
 ```bash
-curl -X POST http://localhost:8080/api/register \
+curl -X POST http://localhost:8000/api/register \
   -H "Content-Type: application/json" \
   -d '{"name":"John Doe","email":"john@example.com","password":"password123"}'
 ```
 
 **Login**:
+
 ```bash
-curl -X POST http://localhost:8080/api/login \
+curl -X POST http://localhost:8000/api/login \
   -H "Content-Type: application/json" \
   -d '{"email":"john@example.com","password":"password123"}'
 ```
 
 **Get events**:
+
 ```bash
-curl -X GET http://localhost:8080/api/events
+curl -X GET http://localhost:8000/api/events
 ```
 
 **Purchase tickets**:
+
 ```bash
-curl -X POST http://localhost:8080/api/events/1/purchase \
+curl -X POST http://localhost:8000/api/events/1/purchase \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"quantity":2}'

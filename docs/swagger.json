@@ -9,7 +9,7 @@
             "email": "support@example.com"
         }
     },
-    "host": "localhost:8005",
+    "host": "localhost:8000",
     "basePath": "/",
     "schemes": ["http", "https"],
     "consumes": ["application/json"],

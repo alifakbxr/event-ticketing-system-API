@@ -5,7 +5,7 @@
 // Terms Of Service: http://swagger.io/terms/
 //
 // Schemes: http, https
-// Host: localhost:8080
+// Host: localhost:8000
 // BasePath: /
 // Version: 1.0.0
 //
@@ -83,10 +83,15 @@ func main() {
  	// Additional endpoint for Swagger UI compatibility
  	r.StaticFile("/docs/swagger.json", "./docs/swagger.json")
 
- 	// Get port from environment variable or default to 8080
+ 	// Redirect root path to Swagger UI
+ 	r.GET("/", func(c *gin.Context) {
+ 		c.Redirect(302, "/swagger/index.html")
+ 	})
+
+ 	// Get port from environment variable or default to 8000
  	port := os.Getenv("PORT")
  	if port == "" {
- 		port = "8080"
+ 		port = "8000"
  	}
 
  	log.Printf("Server starting on port %s", port)
