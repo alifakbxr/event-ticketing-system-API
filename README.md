@@ -74,7 +74,7 @@ cp .env.example .env
 3. **Run the server**:
 
 ```bash
-go run cmd/server/main.go
+go run main.go
 ```
 
 Server starts at `http://localhost:8000`
@@ -164,14 +164,13 @@ curl -X POST http://localhost:8000/api/events/1/purchase \
 
 ```
 event-ticketing-system/
-├── cmd/server/          # Application entry point
+├── main.go             # Application entry point
 ├── internal/
 │   ├── auth/           # JWT authentication
 │   ├── database/       # Database connection
 │   ├── handlers/       # HTTP request handlers
 │   ├── middleware/     # Custom middleware
 │   └── models/         # Database models
-├── pkg/utils/          # Utility functions
 └── docs/               # Swagger documentation
 ```
 
