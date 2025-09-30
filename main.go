@@ -55,10 +55,14 @@ func main() {
 
 	// Initialize database connection
 	db := database.InitDB()
-	defer db.Close()
+	if db != nil {
+		defer db.Close()
 
-	// Auto-migrate the schema
-	db.AutoMigrate(&models.User{}, &models.Event{}, &models.Ticket{}, &models.AttendanceLog{})
+		// Auto-migrate the schema
+		db.AutoMigrate(&models.User{}, &models.Event{}, &models.Ticket{}, &models.AttendanceLog{})
+	} else {
+		log.Println("Warning: Database connection is not available. API endpoints requiring database will not work.")
+	}
 
 	// Add CORS middleware
 	r.Use(middleware.CORSMiddleware)
