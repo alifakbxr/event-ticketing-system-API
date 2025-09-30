@@ -17,16 +17,6 @@ vendor/
 # Go workspace file
 go.work
 
-# Build output directories
-bin/
-dist/
-out/
-
-# Environment files with sensitive data
-.env
-.env.local
-.env.production
-
 # IDE files
 .vscode/
 .idea/
@@ -34,7 +24,7 @@ out/
 *.swo
 *~
 
-# OS generated files
+# OS files
 .DS_Store
 .DS_Store?
 ._*
@@ -43,22 +33,23 @@ out/
 ehthumbs.db
 Thumbs.db
 
+# Environment files
+.env
+.env.local
+.env.production
+
+# Build artifacts
+bin/
+out
+server.exe
+
 # Logs
 *.log
-logs/
 
-# Temporary files
-tmp/
-temp/
-
-# Database files (if any local development)
+# Database files
 *.db
 *.sqlite
-*.sqlite3
 
-# Swagger generated files (if re-generated)
-docs/docs.go
-
-# Air live reload (if used)
-tmp/
-.air.toml
+# Temporary files
+*.tmp
+*.temp
