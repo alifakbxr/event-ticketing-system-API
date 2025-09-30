@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -8,41 +9,36 @@ import (
 	"event-ticketing-system/internal/models"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 )
 
 // JWTAuth middleware validates JWT tokens
-func JWTAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
+func JWTAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
-			c.Abort()
+			http.Error(w, `{"error": "Authorization header required"}`, http.StatusUnauthorized)
 			return
 		}
 
 		// Extract token from "Bearer <token>"
 		tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
 		if tokenString == authHeader {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
-			c.Abort()
+			http.Error(w, `{"error": "Bearer token required"}`, http.StatusUnauthorized)
 			return
 		}
 
 		// Parse and validate token
 		token, err := auth.ValidateToken(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
+			http.Error(w, `{"error": "Invalid token"}`, http.StatusUnauthorized)
 			return
 		}
 
 		// Set user information in context
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
-			c.Abort()
+			http.Error(w, `{"error": "Invalid token claims"}`, http.StatusUnauthorized)
 			return
 		}
 
@@ -50,39 +46,36 @@ func JWTAuth() gin.HandlerFunc {
 		userRole := claims["role"].(string)
 
 		// Get user from database to ensure they still exist
-		db := c.MustGet("db").(*gorm.DB)
+		db := r.Context().Value("db").(*gorm.DB)
 		var user models.User
 		if err := db.Where("id = ?", userID).First(&user).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
-			c.Abort()
+			http.Error(w, `{"error": "User not found"}`, http.StatusUnauthorized)
 			return
 		}
 
 		// Set user info in context for handlers to use
-		c.Set("user_id", userID)
-		c.Set("user_role", userRole)
-		c.Set("user", user)
+		ctx := context.WithValue(r.Context(), "user_id", userID)
+		ctx = context.WithValue(ctx, "user_role", userRole)
+		ctx = context.WithValue(ctx, "user", user)
 
-		c.Next()
-	}
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // AdminAuth middleware ensures user has admin role
-func AdminAuth() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userRole, exists := c.Get("user_role")
-		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "User role not found"})
-			c.Abort()
+func AdminAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userRole := r.Context().Value("user_role")
+		if userRole == nil {
+			http.Error(w, `{"error": "User role not found"}`, http.StatusUnauthorized)
 			return
 		}
 
 		if userRole != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
-			c.Abort()
+			http.Error(w, `{"error": "Admin access required"}`, http.StatusForbidden)
 			return
 		}
 
-		c.Next()
-	}
+		next.ServeHTTP(w, r)
+	})
 }

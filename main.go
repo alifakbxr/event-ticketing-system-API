@@ -26,11 +26,11 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"event-ticketing-system/internal/database"
@@ -38,171 +38,140 @@ import (
 	"event-ticketing-system/internal/middleware"
 	"event-ticketing-system/internal/models"
 
-	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/joho/godotenv"
 )
 
 func main() {
- 	// Load .env file
- 	if err := godotenv.Load(); err != nil {
- 		log.Println("Warning: No .env file found or error loading it:", err)
- 	}
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: No .env file found or error loading it:", err)
+	}
 
- 	// Initialize Gin router
- 	r := gin.New()
+	// Initialize Gorilla Mux router
+	r := mux.NewRouter()
 
- 	// Add middleware
- 	r.Use(gin.Logger())
- 	r.Use(gin.Recovery())
- 	r.Use(middleware.ErrorHandler())
- 	r.Use(middleware.CORSMiddleware())
+	// Initialize database connection
+	db := database.InitDB()
+	defer db.Close()
 
- 	// Initialize database connection
- 	db := database.InitDB()
- 	defer db.Close()
+	// Auto-migrate the schema
+	db.AutoMigrate(&models.User{}, &models.Event{}, &models.Ticket{}, &models.AttendanceLog{})
 
- 	// Auto-migrate the schema
- 	db.AutoMigrate(&models.User{}, &models.Event{}, &models.Ticket{}, &models.AttendanceLog{})
+	// Add CORS middleware
+	r.Use(middleware.CORSMiddleware)
 
- 	// Middleware to inject database into context
- 	r.Use(func(c *gin.Context) {
- 		c.Set("db", db)
- 		c.Next()
- 	})
+	// Middleware to inject database into context
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ctx := context.WithValue(req.Context(), "db", db)
+			next.ServeHTTP(w, req.WithContext(ctx))
+		})
+	})
 
- 	// Setup routes
- 	setupRoutes(r, db)
+	// Setup routes
+	setupRoutes(r, db)
 
- 	// Swagger endpoint - Dynamic URL configuration
- 	swaggerURL := ginSwagger.URL(getSwaggerURL())
- 	log.Printf("Swagger documentation URL: %s", getSwaggerURL())
- 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
+	// Swagger JSON endpoint - serve dynamically from SWAGGER_URL environment variable
+	swaggerFilePath := getSwaggerFilePath()
+	if swaggerFilePath == "" {
+		log.Fatal("SWAGGER_URL environment variable is required but not set")
+	}
+	r.Path("/docs/swagger.json").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, swaggerFilePath)
+	}))
 
- 	// Additional endpoint for Swagger UI compatibility
- 	r.StaticFile("/docs/swagger.json", getSwaggerFilePath())
+	// Redirect root path to Swagger UI (placeholder - adjust path as needed)
+	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/swagger/index.html", http.StatusFound)
+	})
 
- 	// Redirect root path to Swagger UI
- 	r.GET("/", func(c *gin.Context) {
- 		c.Redirect(302, "/swagger/index.html")
- 	})
+	// Get port from environment variable or default to 8000
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8000"
+	}
 
- 	// Get port from environment variable or default to 8000
- 	port := os.Getenv("PORT")
- 	if port == "" {
- 		port = "8000"
- 	}
-
- 	log.Printf("Server starting on port %s", port)
- 	log.Printf("Swagger UI available at http://localhost:%s/swagger/index.html", port)
- 	log.Fatal(r.Run(":" + port))
+	log.Printf("Server starting on port %s", port)
+	log.Printf("Swagger JSON available at http://localhost:%s/docs/swagger.json", port)
+	log.Fatal(http.ListenAndServe(":"+port, r))
 }
 
 // setupRoutes configures all API routes
-func setupRoutes(r *gin.Engine, db *gorm.DB) {
- 	// Initialize handlers
- 	authHandler := handlers.NewAuthHandler(db)
- 	eventHandler := handlers.NewEventHandler(db)
- 	ticketHandler := handlers.NewTicketHandler(db)
+func setupRoutes(r *mux.Router, db *gorm.DB) {
+	// Initialize handlers
+	authHandler := handlers.NewAuthHandler(db)
+	eventHandler := handlers.NewEventHandler(db)
+	ticketHandler := handlers.NewTicketHandler(db)
 
- 	// Public routes
- 	public := r.Group("/api")
- 	{
- 		// Authentication routes
- 		public.POST("/register", authHandler.Register)
- 		public.POST("/login", authHandler.Login)
- 		public.POST("/logout", authHandler.Logout)
- 	}
+	// Public routes
+	public := r.PathPrefix("/api").Subrouter()
+	{
+		// Authentication routes
+		public.HandleFunc("/register", authHandler.Register).Methods("POST")
+		public.HandleFunc("/login", authHandler.Login).Methods("POST")
+		public.HandleFunc("/logout", authHandler.Logout).Methods("POST")
+	}
 
- 	// Protected routes
- 	protected := r.Group("/api")
- 	protected.Use(middleware.JWTAuth())
- 	{
- 		// Event routes (public for browsing, protected for creation)
- 		protected.GET("/events", eventHandler.GetEvents)
- 		protected.GET("/events/:id", eventHandler.GetEvent)
+	// Protected routes
+	protected := r.PathPrefix("/api").Subrouter()
+	protected.Use(middleware.JWTAuth)
+	{
+		// Event routes (public for browsing, protected for creation)
+		protected.HandleFunc("/events", eventHandler.GetEvents).Methods("GET")
+		protected.HandleFunc("/events/{id}", eventHandler.GetEvent).Methods("GET")
 
- 		// Ticket routes
- 		protected.POST("/events/:id/purchase", ticketHandler.PurchaseTicket)
- 		protected.GET("/tickets", ticketHandler.GetTickets)
- 		protected.GET("/tickets/:id", ticketHandler.GetTicket)
- 	}
+		// Ticket routes
+		protected.HandleFunc("/events/{id}/purchase", ticketHandler.PurchaseTicket).Methods("POST")
+		protected.HandleFunc("/tickets", ticketHandler.GetTickets).Methods("GET")
+		protected.HandleFunc("/tickets/{id}", ticketHandler.GetTicket).Methods("GET")
+	}
 
- 	// Admin routes
- 	admin := r.Group("/api")
- 	admin.Use(middleware.JWTAuth())
- 	admin.Use(middleware.AdminAuth())
- 	{
- 		// Event management routes
- 		admin.POST("/events", eventHandler.CreateEvent)
- 		admin.PUT("/events/:id", eventHandler.UpdateEvent)
- 		admin.DELETE("/events/:id", eventHandler.DeleteEvent)
+	// Admin routes
+	admin := r.PathPrefix("/api").Subrouter()
+	admin.Use(middleware.JWTAuth)
+	admin.Use(middleware.AdminAuth)
+	{
+		// Event management routes
+		admin.HandleFunc("/events", eventHandler.CreateEvent).Methods("POST")
+		admin.HandleFunc("/events/{id}", eventHandler.UpdateEvent).Methods("PUT")
+		admin.HandleFunc("/events/{id}", eventHandler.DeleteEvent).Methods("DELETE")
 
- 		// Ticket validation routes
- 		admin.POST("/tickets/:id/validate", ticketHandler.ValidateTicket)
+		// Ticket validation routes
+		admin.HandleFunc("/tickets/{id}/validate", ticketHandler.ValidateTicket).Methods("POST")
 
- 		// Attendee management routes
- 		admin.GET("/events/:id/attendees", ticketHandler.GetEventAttendees)
- 		admin.GET("/events/:id/attendees/export", ticketHandler.ExportAttendees)
- 	}
+		// Attendee management routes
+		admin.HandleFunc("/events/{id}/attendees", ticketHandler.GetEventAttendees).Methods("GET")
+		admin.HandleFunc("/events/{id}/attendees/export", ticketHandler.ExportAttendees).Methods("GET")
+	}
 }
 
-// getSwaggerURL returns the dynamic swagger URL based on environment variables or calculated paths
-func getSwaggerURL() string {
- 	// Method 1: Environment Variable (highest priority)
- 	if swaggerURL := os.Getenv("SWAGGER_URL"); swaggerURL != "" {
- 		return swaggerURL
- 	}
+// getSwaggerFilePath returns the full file path for swagger.json based on SWAGGER_URL environment variable
+func getSwaggerFilePath() string {
+	// Get SWAGGER_URL from environment variable
+	swaggerURL := os.Getenv("SWAGGER_URL")
+	if swaggerURL == "" {
+		log.Fatal("SWAGGER_URL environment variable is not set")
+		return ""
+	}
 
- 	// Method 2: Dynamic path calculation based on executable location
- 	if execPath, err := os.Executable(); err == nil {
- 		execDir := filepath.Dir(execPath)
- 		// Go up from project root to docs
- 		projectRoot := filepath.Dir(execDir)
- 		swaggerPath := filepath.Join(projectRoot, "docs", "swagger.json")
+	// If it's a full URL, parse it and return just the path component
+	if strings.HasPrefix(swaggerURL, "http://") || strings.HasPrefix(swaggerURL, "https://") {
+		if u, err := url.Parse(swaggerURL); err == nil && u.Path != "" {
+			return u.Path
+		} else {
+			log.Fatalf("Invalid SWAGGER_URL format: %s, error: %v", swaggerURL, err)
+			return ""
+		}
+	}
 
- 		// Check if file exists
- 		if _, err := os.Stat(swaggerPath); err == nil {
- 			return fmt.Sprintf("file:///%s", filepath.ToSlash(swaggerPath))
- 		}
- 	}
+	// If it's already a file path, validate it exists
+	if _, err := os.Stat(swaggerURL); err != nil {
+		log.Fatalf("Swagger file not found at path: %s, error: %v", swaggerURL, err)
+		return ""
+	}
 
- 	// Method 3: Relative path as fallback (original behavior)
- 	// This works when running from project root: go run .
- 	return "docs/swagger.json"
- }
- 
- // getSwaggerFilePath returns the file path for swagger.json, handling URL parsing
- func getSwaggerFilePath() string {
- 	// Method 1: Environment Variable (highest priority)
- 	if swaggerURL := os.Getenv("SWAGGER_URL"); swaggerURL != "" {
- 		// If it's a full URL, parse it and return just the path component
- 		if strings.HasPrefix(swaggerURL, "http://") || strings.HasPrefix(swaggerURL, "https://") {
- 			if u, err := url.Parse(swaggerURL); err == nil && u.Path != "" {
- 				return u.Path
- 			}
- 		}
- 		// If it's already a path, return as-is
- 		return swaggerURL
- 	}
- 
- 	// Method 2: Dynamic path calculation based on executable location
- 	if execPath, err := os.Executable(); err == nil {
- 		execDir := filepath.Dir(execPath)
- 		// Go up from project root to docs
- 		projectRoot := filepath.Dir(execDir)
- 		swaggerPath := filepath.Join(projectRoot, "docs", "swagger.json")
- 
- 		// Check if file exists
- 		if _, err := os.Stat(swaggerPath); err == nil {
- 			return swaggerPath
- 		}
- 	}
- 
- 	// Method 3: Relative path as fallback (original behavior)
- 	// This works when running from project root: go run .
- 	return "docs/swagger.json"
- }
+	return swaggerURL
+}

@@ -25,19 +25,19 @@ func ErrorHandler() gin.HandlerFunc {
 }
 
 // CORSMiddleware handles CORS
-func CORSMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+func CORSMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 
-		c.Next()
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // RequestLogger logs HTTP requests

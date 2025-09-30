@@ -1,13 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
 	"event-ticketing-system/internal/models"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 )
 
@@ -43,126 +44,58 @@ type UpdateEventRequest struct {
 }
 
 // GetEvents retrieves all events
-// swagger:operation GET /api/events events getEvents
-// ---
-// summary: Get all events
-// description: Retrieves a list of all available events
-// tags:
-// - Events
-// responses:
-//   200:
-//     description: List of events retrieved successfully
-//     schema:
-//       type: array
-//       items:
-//         "$ref": "#/definitions/Event"
-//   500:
-//     description: Internal server error
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-func (h *EventHandler) GetEvents(c *gin.Context) {
+func (h *EventHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	var events []models.Event
 	if err := h.db.Preload("Tickets").Find(&events).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve events"})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to retrieve events"})
 		return
 	}
 
-	c.JSON(http.StatusOK, events)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(events)
 }
 
 // GetEvent retrieves a specific event by ID
-// swagger:operation GET /api/events/{id} events getEvent
-// ---
-// summary: Get event by ID
-// description: Retrieves a specific event by its ID
-// tags:
-// - Events
-// parameters:
-// - name: id
-//   in: path
-//   description: Event ID
-//   required: true
-//   type: integer
-//   format: int64
-// responses:
-//   200:
-//     description: Event retrieved successfully
-//     schema:
-//       "$ref": "#/definitions/Event"
-//   400:
-//     description: Invalid event ID
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   404:
-//     description: Event not found
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   500:
-//     description: Internal server error
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-func (h *EventHandler) GetEvent(c *gin.Context) {
-	id := c.Param("id")
+func (h *EventHandler) GetEvent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Get ID from URL parameters (Gorilla Mux way)
+	vars := mux.Vars(r)
+	id := vars["id"]
 	eventID, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid event ID"})
 		return
 	}
 
 	var event models.Event
 	if err := h.db.Preload("Tickets").Where("id = ?", eventID).First(&event).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Event not found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve event"})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to retrieve event"})
 		return
 	}
 
-	c.JSON(http.StatusOK, event)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(event)
 }
 
 // CreateEvent creates a new event (admin only)
-// swagger:operation POST /api/events events createEvent
-// ---
-// summary: Create a new event
-// description: Creates a new event (admin only)
-// tags:
-// - Events
-// security:
-// - Bearer: []
-// parameters:
-// - name: request
-//   in: body
-//   description: Event creation data
-//   required: true
-//   schema:
-//     "$ref": "#/definitions/CreateEventRequest"
-// responses:
-//   201:
-//     description: Event created successfully
-//     schema:
-//       "$ref": "#/definitions/Event"
-//   400:
-//     description: Invalid request data
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   401:
-//     description: Unauthorized
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   403:
-//     description: Admin access required
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   500:
-//     description: Internal server error
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-func (h *EventHandler) CreateEvent(c *gin.Context) {
+func (h *EventHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	var req CreateEventRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -176,81 +109,45 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&event).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create event"})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create event"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, event)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(event)
 }
 
 // UpdateEvent updates an existing event (admin only)
-// swagger:operation PUT /api/events/{id} events updateEvent
-// ---
-// summary: Update an existing event
-// description: Updates an existing event by ID (admin only)
-// tags:
-// - Events
-// security:
-// - Bearer: []
-// parameters:
-// - name: id
-//   in: path
-//   description: Event ID
-//   required: true
-//   type: integer
-//   format: int64
-// - name: request
-//   in: body
-//   description: Event update data
-//   required: true
-//   schema:
-//     "$ref": "#/definitions/UpdateEventRequest"
-// responses:
-//   200:
-//     description: Event updated successfully
-//     schema:
-//       "$ref": "#/definitions/Event"
-//   400:
-//     description: Invalid request data or event ID
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   401:
-//     description: Unauthorized
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   403:
-//     description: Admin access required
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   404:
-//     description: Event not found
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   500:
-//     description: Internal server error
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-func (h *EventHandler) UpdateEvent(c *gin.Context) {
-	id := c.Param("id")
+func (h *EventHandler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Get ID from URL parameters (Gorilla Mux way)
+	vars := mux.Vars(r)
+	id := vars["id"]
 	eventID, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid event ID"})
 		return
 	}
 
 	var event models.Event
 	if err := h.db.Where("id = ?", eventID).First(&event).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Event not found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve event"})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to retrieve event"})
 		return
 	}
 
 	var req UpdateEventRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -275,63 +172,26 @@ func (h *EventHandler) UpdateEvent(c *gin.Context) {
 	}
 
 	if err := h.db.Save(&event).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update event"})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to update event"})
 		return
 	}
 
-	c.JSON(http.StatusOK, event)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(event)
 }
 
 // DeleteEvent deletes an event (admin only)
-// swagger:operation DELETE /api/events/{id} events deleteEvent
-// ---
-// summary: Delete an event
-// description: Deletes an existing event by ID (admin only). Cannot delete events with existing tickets.
-// tags:
-// - Events
-// security:
-// - Bearer: []
-// parameters:
-// - name: id
-//   in: path
-//   description: Event ID
-//   required: true
-//   type: integer
-//   format: int64
-// responses:
-//   200:
-//     description: Event deleted successfully
-//     schema:
-//       type: object
-//       properties:
-//         message:
-//           type: string
-//           example: "Event deleted successfully"
-//   400:
-//     description: Invalid event ID or event has existing tickets
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   401:
-//     description: Unauthorized
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   403:
-//     description: Admin access required
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   404:
-//     description: Event not found
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-//   500:
-//     description: Internal server error
-//     schema:
-//       "$ref": "#/definitions/ErrorResponse"
-func (h *EventHandler) DeleteEvent(c *gin.Context) {
-	id := c.Param("id")
+func (h *EventHandler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Get ID from URL parameters (Gorilla Mux way)
+	vars := mux.Vars(r)
+	id := vars["id"]
 	eventID, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid event ID"})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid event ID"})
 		return
 	}
 
@@ -339,10 +199,12 @@ func (h *EventHandler) DeleteEvent(c *gin.Context) {
 	var event models.Event
 	if err := h.db.Where("id = ?", eventID).First(&event).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Event not found"})
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Event not found"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve event"})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to retrieve event"})
 		return
 	}
 
@@ -350,14 +212,17 @@ func (h *EventHandler) DeleteEvent(c *gin.Context) {
 	var ticketCount int64
 	h.db.Model(&models.Ticket{}).Where("event_id = ?", eventID).Count(&ticketCount)
 	if ticketCount > 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot delete event with existing tickets"})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Cannot delete event with existing tickets"})
 		return
 	}
 
 	if err := h.db.Delete(&event).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete event"})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to delete event"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Event deleted successfully"})
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Event deleted successfully"})
 }
