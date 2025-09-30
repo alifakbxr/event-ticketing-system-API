@@ -28,8 +28,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"event-ticketing-system/internal/database"
 	"event-ticketing-system/internal/handlers"
@@ -81,7 +83,7 @@ func main() {
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
 	// Additional endpoint for Swagger UI compatibility
-	r.StaticFile("/docs/swagger.json", "./docs/swagger.json")
+	r.StaticFile("/docs/swagger.json", getSwaggerFilePath())
 
 	// Get port from environment variable or default to 8000
 	port := os.Getenv("PORT")
@@ -160,6 +162,38 @@ func getSwaggerURL() string {
 		// Check if file exists
 		if _, err := os.Stat(swaggerPath); err == nil {
 			return fmt.Sprintf("file:///%s", filepath.ToSlash(swaggerPath))
+		}
+	}
+
+	// Method 3: Relative path as fallback (original behavior)
+	// This works when running from project root: go run ./cmd/server
+	return "../../docs/swagger.json"
+}
+
+// getSwaggerFilePath returns the file path for swagger.json, handling URL parsing
+func getSwaggerFilePath() string {
+	// Method 1: Environment Variable (highest priority)
+	if swaggerURL := os.Getenv("SWAGGER_URL"); swaggerURL != "" {
+		// If it's a full URL, parse it and return just the path component
+		if strings.HasPrefix(swaggerURL, "http://") || strings.HasPrefix(swaggerURL, "https://") {
+			if u, err := url.Parse(swaggerURL); err == nil && u.Path != "" {
+				return u.Path
+			}
+		}
+		// If it's already a path, return as-is
+		return swaggerURL
+	}
+
+	// Method 2: Dynamic path calculation based on executable location
+	if execPath, err := os.Executable(); err == nil {
+		execDir := filepath.Dir(execPath)
+		// Go up from cmd/server to project root, then to docs
+		projectRoot := filepath.Dir(filepath.Dir(execDir))
+		swaggerPath := filepath.Join(projectRoot, "docs", "swagger.json")
+
+		// Check if file exists
+		if _, err := os.Stat(swaggerPath); err == nil {
+			return swaggerPath
 		}
 	}
 
